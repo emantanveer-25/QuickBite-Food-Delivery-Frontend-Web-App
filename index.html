@@ -1,0 +1,602 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>3D FoodieVerse | Order with Flavor & Dimension</title>
+  <!-- Google Fonts & Font Awesome -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none; /* avoid accidental selection on 3D canvas, but text remains selectable */
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0c12;
+      overflow-x: hidden;
+      color: #fff;
+    }
+
+    /* Canvas 3D background - stays behind content, no pointer events */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Main content layer */
+    .content {
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+      backdrop-filter: blur(2px);
+    }
+
+    /* Glassmorphic header */
+    .glass-header {
+      background: rgba(20, 25, 40, 0.6);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #FFB347, #FF6B4A);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .logo i {
+      background: none;
+      color: #FF8C42;
+      -webkit-background-clip: unset;
+      background-clip: unset;
+      font-size: 2rem;
+    }
+
+    .order-badge {
+      background: rgba(255, 108, 55, 0.25);
+      padding: 0.5rem 1.2rem;
+      border-radius: 60px;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,140,66,0.5);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .order-badge i {
+      margin-right: 8px;
+      color: #ff9f4a;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 4rem 2rem 2rem;
+    }
+    .hero h1 {
+      font-size: 3.2rem;
+      font-weight: 800;
+      background: linear-gradient(145deg, #FFFFFF, #FFD7A7);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .hero p {
+      font-size: 1.2rem;
+      color: #cdd9ff;
+      max-width: 650px;
+      margin: 1rem auto 0;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255, 100, 50, 0.2);
+      border-radius: 100px;
+      padding: 0.3rem 1rem;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 100, 50, 0.4);
+    }
+
+    /* Food menu grid - glass cards with 3D hover */
+    .menu-section {
+      max-width: 1300px;
+      margin: 3rem auto;
+      padding: 0 2rem;
+    }
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      text-align: center;
+      letter-spacing: -0.3px;
+      background: linear-gradient(135deg, #eee, #ffb77c);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+    }
+    .food-card {
+      background: rgba(18, 22, 35, 0.65);
+      backdrop-filter: blur(12px);
+      border-radius: 2rem;
+      padding: 1.5rem;
+      transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 20px 35px -12px rgba(0,0,0,0.3);
+      transform-style: preserve-3d;
+      perspective: 800px;
+    }
+    .food-card:hover {
+      transform: translateY(-12px) scale(1.02);
+      background: rgba(28, 34, 54, 0.8);
+      border-color: #ff9f4a80;
+      box-shadow: 0 28px 40px -15px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,140,66,0.2);
+    }
+    .card-icon {
+      font-size: 3rem;
+      background: linear-gradient(145deg, #FFB347, #FF6B4A);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      width: fit-content;
+      margin-bottom: 1rem;
+    }
+    .food-card h3 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .desc {
+      color: #b9c3e6;
+      font-size: 0.9rem;
+      margin: 0.75rem 0;
+      line-height: 1.4;
+    }
+    .price {
+      font-size: 1.7rem;
+      font-weight: 800;
+      color: #ffb155;
+      margin: 1rem 0 1rem;
+    }
+    .order-btn {
+      background: linear-gradient(95deg, #ff6b35, #ff8c42);
+      border: none;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      border-radius: 3rem;
+      font-weight: 700;
+      font-size: 1rem;
+      color: white;
+      cursor: pointer;
+      transition: 0.25s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 5px 12px rgba(255, 107, 53, 0.3);
+    }
+    .order-btn:hover {
+      background: linear-gradient(95deg, #ff571f, #ff7a2f);
+      transform: scale(0.97);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    }
+
+    /* footer 3d vibe */
+    .footer-3d {
+      text-align: center;
+      padding: 2rem;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      margin-top: 3rem;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.2rem; }
+      .glass-header { padding: 1rem; }
+      .menu-section { padding: 0 1rem; }
+      .food-card h3 { font-size: 1.4rem; }
+    }
+
+    /* custom scroll */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #141824;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #ff8c42;
+      border-radius: 8px;
+    }
+    button {
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div class="content">
+  <header class="glass-header">
+    <div class="logo">
+      <i class="fas fa-hamburger"></i>
+      <span>QuickBite</span><span style="color:#ff9e4a">|Food Delivery App</span></span>
+    </div>
+    <div class="order-badge">
+      <i class="fas fa-cube"></i> 3D interactive menu · live flavors
+    </div>
+  </header>
+
+  <div class="hero">
+    <h1>DIMENSIONAL <span style="color:#ff9f4a">TASTE</span></h1>
+    <p>Step into a 3D gastronomic journey. Rotating holographic burger, immersive atmosphere, and finger-licking orders.</p>
+    <div class="hero-badge">
+      <i class="fas fa-eye"></i> 3D interactive scene | real-time
+    </div>
+  </div>
+
+  <div class="menu-section">
+    <div class="section-title">
+      <i class="fas fa-fire"></i> crave-worthy picks · order instantly
+    </div>
+    <div class="menu-grid" id="menu-grid">
+      <!-- cards will be populated via JS for clean code but also static fallback? dynamically but consistent -->
+    </div>
+  </div>
+  <div class="footer-3d">
+    <i class="fas fa-robot"></i> 3D gourmet experience · every order made with love | <i class="fas fa-crown"></i> immersive UI
+  </div>
+</div>
+
+<!-- Three.js library -->
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+    }
+  }
+</script>
+
+<script type="module">
+  import * as THREE from 'three';
+
+  // --- setup scene, camera, renderer ---
+  const container = document.getElementById('canvas-container');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05070f);
+  scene.fog = new THREE.FogExp2(0x05070f, 0.008); // subtle depth
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 2.2, 8);
+  camera.lookAt(0, 0.5, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true; // shadows make it pop
+  renderer.setPixelRatio(window.devicePixelRatio);
+  container.appendChild(renderer.domElement);
+
+  // --- lighting system: dramatic food lighting ---
+  // ambient
+  const ambientLight = new THREE.AmbientLight(0x404060);
+  scene.add(ambientLight);
+  // key light warm
+  const mainLight = new THREE.DirectionalLight(0xffaa77, 1.2);
+  mainLight.position.set(3, 5, 2);
+  mainLight.castShadow = true;
+  mainLight.receiveShadow = false;
+  mainLight.shadow.mapSize.width = 1024;
+  mainLight.shadow.mapSize.height = 1024;
+  scene.add(mainLight);
+  // fill light cool from back
+  const fillLight = new THREE.PointLight(0x4466cc, 0.5);
+  fillLight.position.set(-2, 3, -4);
+  scene.add(fillLight);
+  // rim light hot
+  const rimLight = new THREE.PointLight(0xff6633, 0.7);
+  rimLight.position.set(1, 2.5, -3);
+  scene.add(rimLight);
+  // extra soft fill from below
+  const underLight = new THREE.PointLight(0xffaa66, 0.3);
+  underLight.position.set(0, -1, 0);
+  scene.add(underLight);
+  
+  // glowing particle system around center
+  const particleCount = 800;
+  const particleGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  for (let i = 0; i < particleCount; i++) {
+    // spherical cloud radius 2.5 to 4.5
+    const radius = 2.8 + Math.random() * 1.8;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const x = radius * Math.sin(phi) * Math.cos(theta);
+    const y = radius * Math.sin(phi) * Math.sin(theta) * 0.7 + 0.5; // flatten a bit
+    const z = radius * Math.cos(phi);
+    positions[i*3] = x;
+    positions[i*3+1] = y;
+    positions[i*3+2] = z;
+  }
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0xffaa66,
+    size: 0.045,
+    transparent: true,
+    opacity: 0.5,
+    blending: THREE.AdditiveBlending
+  });
+  const particleField = new THREE.Points(particleGeometry, particleMaterial);
+  scene.add(particleField);
+  
+  // second particle field with tiny sparkles
+  const sparkleCount = 1500;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPos = new Float32Array(sparkleCount * 3);
+  for (let i = 0; i < sparkleCount; i++) {
+    sparkPos[i*3] = (Math.random() - 0.5) * 14;
+    sparkPos[i*3+1] = (Math.random() - 0.5) * 6 + 1;
+    sparkPos[i*3+2] = (Math.random() - 0.5) * 12 - 4;
+  }
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  const sparkMat = new THREE.PointsMaterial({ color: 0xff9966, size: 0.02, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+  const sparkles = new THREE.Points(sparkGeo, sparkMat);
+  scene.add(sparkles);
+  
+  // --- Build a delicious 3D burger with multiple components (fully detailed) ---
+  const burgerGroup = new THREE.Group();
+  
+  // bottom bun
+  const bottomBunGeo = new THREE.CylinderGeometry(1.35, 1.5, 0.48, 32);
+  const bottomMat = new THREE.MeshStandardMaterial({ color: 0xd69448, roughness: 0.4, metalness: 0.1, emissive: 0x331a00, emissiveIntensity: 0.12 });
+  const bottomBun = new THREE.Mesh(bottomBunGeo, bottomMat);
+  bottomBun.position.y = -0.85;
+  bottomBun.castShadow = true;
+  bottomBun.receiveShadow = false;
+  burgerGroup.add(bottomBun);
+  
+  // patty (juicy)
+  const pattyGeo = new THREE.CylinderGeometry(1.28, 1.3, 0.22, 32);
+  const pattyMat = new THREE.MeshStandardMaterial({ color: 0x8b3c1c, roughness: 0.55, metalness: 0.05, emissive: 0x3a1a09, emissiveIntensity: 0.1 });
+  const patty = new THREE.Mesh(pattyGeo, pattyMat);
+  patty.position.y = -0.48;
+  patty.castShadow = true;
+  burgerGroup.add(patty);
+  
+  // cheese slice
+  const cheeseGeo = new THREE.CylinderGeometry(1.32, 1.34, 0.1, 32);
+  const cheeseMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, roughness: 0.3, metalness: 0.05, emissive: 0x442200, emissiveIntensity: 0.08 });
+  const cheese = new THREE.Mesh(cheeseGeo, cheeseMat);
+  cheese.position.y = -0.3;
+  cheese.castShadow = true;
+  burgerGroup.add(cheese);
+  
+  // lettuce wavy style (two rings effect)
+  const lettuceGeo = new THREE.CylinderGeometry(1.4, 1.38, 0.12, 32);
+  const lettuceMat = new THREE.MeshStandardMaterial({ color: 0x6bb53a, roughness: 0.6, metalness: 0.02 });
+  const lettuce = new THREE.Mesh(lettuceGeo, lettuceMat);
+  lettuce.position.y = -0.12;
+  lettuce.castShadow = true;
+  burgerGroup.add(lettuce);
+  
+  // tomato layer
+  const tomatoGeo = new THREE.CylinderGeometry(1.36, 1.37, 0.1, 32);
+  const tomatoMat = new THREE.MeshStandardMaterial({ color: 0xe3512e, roughness: 0.35 });
+  const tomato = new THREE.Mesh(tomatoGeo, tomatoMat);
+  tomato.position.y = 0.05;
+  tomato.castShadow = true;
+  burgerGroup.add(tomato);
+  
+  // Top bun (golden)
+  const topBunGeo = new THREE.CylinderGeometry(1.48, 1.65, 0.62, 32);
+  const topMat = new THREE.MeshStandardMaterial({ color: 0xd4a259, roughness: 0.38, metalness: 0.08, emissive: 0x492c0a, emissiveIntensity: 0.07 });
+  const topBun = new THREE.Mesh(topBunGeo, topMat);
+  topBun.position.y = 0.42;
+  topBun.castShadow = true;
+  burgerGroup.add(topBun);
+  
+  // sesame seeds (many small spheres)
+  const sesameMat = new THREE.MeshStandardMaterial({ color: 0xf5e2b2, emissive: 0x553d1a, emissiveIntensity: 0.1 });
+  const seedPositions = [
+    [-0.7, 0.74, 0.7], [0.8, 0.73, 0.65], [0.2, 0.77, 1.0], [-0.3, 0.77, 0.98], 
+    [1.0, 0.71, -0.2], [-1.05, 0.72, -0.1], [0.55, 0.75, -0.9], [-0.6, 0.75, -0.85],
+    [0.9, 0.73, 0.2], [-0.85, 0.74, 0.3], [0.0, 0.79, 1.1], [0.3, 0.77, -1.05], [-0.25, 0.77, -1.07],
+    [1.12, 0.7, -0.55], [-1.12, 0.71, 0.55], [0.45, 0.76, 0.95], [-0.45, 0.76, 0.96]
+  ];
+  seedPositions.forEach(pos => {
+    const seed = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 16), sesameMat);
+    seed.position.set(pos[0], pos[1], pos[2]);
+    seed.castShadow = true;
+    burgerGroup.add(seed);
+  });
+  
+  // extra spice: glowing sauce drips? small ruby spheres
+  const sauceMat = new THREE.MeshStandardMaterial({ color: 0xdb4d2a, emissive: 0x441100, emissiveIntensity: 0.2 });
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const rad = 1.38;
+    const x = Math.cos(angle) * rad;
+    const z = Math.sin(angle) * rad;
+    const drip = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), sauceMat);
+    drip.position.set(x, -0.02, z);
+    burgerGroup.add(drip);
+  }
+  
+  scene.add(burgerGroup);
+  
+  // floating glowing ring around burger (orbiting particles)
+  const orbitRingPoints = [];
+  const ringCount = 60;
+  const ringRadius = 2.1;
+  for (let i = 0; i < ringCount; i++) {
+    orbitRingPoints.push(new THREE.Vector3(Math.cos(i * Math.PI * 2 / ringCount) * ringRadius, 0.3 + Math.sin(i * 0.5) * 0.15, Math.sin(i * Math.PI * 2 / ringCount) * ringRadius));
+  }
+  const orbitRingGeo = new THREE.BufferGeometry().setFromPoints(orbitRingPoints);
+  const orbitMat = new THREE.PointsMaterial({ color: 0xff8844, size: 0.06, transparent: true, blending: THREE.AdditiveBlending });
+  const orbitPoints = new THREE.Points(orbitRingGeo, orbitMat);
+  scene.add(orbitPoints);
+  
+  // additional floating dust (spices)
+  const spiceGroup = new THREE.Group();
+  for (let i=0;i<200;i++) {
+    const dust = new THREE.Mesh(new THREE.SphereGeometry(0.02 + Math.random()*0.03, 4), new THREE.MeshStandardMaterial({ color: 0xffaa66, emissive: 0xff5522, emissiveIntensity: 0.15 }));
+    dust.position.set((Math.random() - 0.5) * 3.8, (Math.random() - 0.5) * 2.5 + 0.2, (Math.random() - 0.5) * 3.5);
+    spiceGroup.add(dust);
+  }
+  scene.add(spiceGroup);
+  
+  // simple ground reflection effect (translucent disc)
+  const discMat = new THREE.MeshStandardMaterial({ color: 0x331c0a, roughness: 0.8, metalness: 0.2, transparent: true, opacity: 0.25 });
+  const groundDisc = new THREE.Mesh(new THREE.CircleGeometry(2.6, 16), discMat);
+  groundDisc.rotation.x = -Math.PI / 2;
+  groundDisc.position.y = -1.2;
+  groundDisc.receiveShadow = false;
+  scene.add(groundDisc);
+  
+  // subtle rotating stars background? small saturate
+  const starFieldGeo = new THREE.BufferGeometry();
+  const starPositions = [];
+  for (let i = 0; i < 800; i++) {
+    starPositions.push((Math.random() - 0.5) * 200);
+    starPositions.push((Math.random() - 0.5) * 100);
+    starPositions.push((Math.random() - 0.5) * 80 - 40);
+  }
+  starFieldGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPositions), 3));
+  const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.4 });
+  const stars = new THREE.Points(starFieldGeo, starMaterial);
+  scene.add(stars);
+  
+  // animation variables
+  let time = 0;
+  
+  // animate loop
+  function animate() {
+    requestAnimationFrame(animate);
+    time += 0.012;
+    
+    // rotate burger group smoothly and slight levitation
+    burgerGroup.rotation.y = time * 0.45;
+    burgerGroup.position.y = Math.sin(time * 1.2) * 0.03;
+    // orbit ring rotation
+    orbitPoints.rotation.y = time * 0.6;
+    orbitPoints.rotation.x = Math.sin(time * 0.4) * 0.1;
+    // spice group floats
+    spiceGroup.rotation.y = time * 0.15;
+    spiceGroup.rotation.x = Math.sin(time * 0.27) * 0.1;
+    // particles rotate
+    particleField.rotation.y = time * 0.08;
+    particleField.rotation.x = Math.sin(time * 0.2) * 0.1;
+    sparkles.rotation.y = time * 0.03;
+    stars.rotation.y = time * 0.01;
+    
+    // camera slight orbit (very subtle to give cinematic feel)
+    camera.position.x = Math.sin(time * 0.1) * 0.15;
+    camera.position.y = 2.1 + Math.sin(time * 0.5) * 0.03;
+    camera.lookAt(0, 0.4, 0);
+    
+    renderer.render(scene, camera);
+  }
+  
+  animate();
+  
+  // resize handler
+  window.addEventListener('resize', onWindowResize, false);
+  function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  
+  // --- Menu data & Generate cards (with interactive order alert) ---
+  const menuItems = [
+    { name: "Cosmic Burger", icon: "fa-burger", desc: "Double smashed patty, cheddar, 3D sauce, caramelized onion.", price: "$12.99", tag: "🔥 best seller" },
+    { name: "Neapolitan Pizza", icon: "fa-pizza-slice", desc: "San Marzano tomatoes, mozzarella, basil, & extra virgin.", price: "$14.49", tag: "vegetarian" },
+    { name: "Truffle Pasta", icon: "fa-utensils", desc: "Wild mushrooms, parmesan cream, black truffle oil.", price: "$16.99", tag: "chef's special" },
+    { name: "Spiced Fries", icon: "fa-french-fries", desc: "Crinkle cut, peri-peri salt, garlic aioli dip.", price: "$6.99", tag: "crispy" },
+    { name: "Mango Habanero Wings", icon: "fa-drumstick-bite", desc: "Sticky sweet & spicy, blue cheese dip.", price: "$11.49", tag: "🔥 spicy" },
+    { name: "Choco Lava Cake", icon: "fa-cake-candles", desc: "Warm molten chocolate core, vanilla gelato.", price: "$7.99", tag: "dessert" }
+  ];
+  
+  const gridContainer = document.getElementById('menu-grid');
+  function buildCards() {
+    gridContainer.innerHTML = '';
+    menuItems.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'food-card';
+      card.innerHTML = `
+        <div class="card-icon"><i class="fas ${item.icon}"></i></div>
+        <h3>${item.name}</h3>
+        <div class="desc">${item.desc}</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span class="price">${item.price}</span>
+          <span style="background: rgba(255,100,50,0.3); padding: 0.2rem 0.6rem; border-radius: 40px; font-size:0.7rem;">${item.tag}</span>
+        </div>
+        <button class="order-btn" data-name="${item.name}" data-price="${item.price}"><i class="fas fa-cart-shopping"></i> Order Now</button>
+      `;
+      gridContainer.appendChild(card);
+    });
+    // attach event listeners
+    document.querySelectorAll('.order-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const foodName = btn.getAttribute('data-name');
+        alert(`✨ ${foodName} added to your 3D table! \n🚀 Ready for pickup or delivery. Experience flavor in dimensions.`);
+      });
+    });
+  }
+  buildCards();
+</script>
+
+<!-- additional small style for elegance -->
+<style>
+  .food-card .order-btn i {
+    transition: transform 0.2s;
+  }
+  .food-card .order-btn:hover i {
+    transform: translateX(4px);
+  }
+  #canvas-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .content {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+  .glass-header, .footer-3d {
+    transition: all 0.2s;
+  }
+</style>
+</body>
+</html>
